@@ -3,6 +3,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
+import re
 
 app = Celery('tasks')
 
@@ -15,6 +16,7 @@ def save(contentlist):
     with open(fname ,'w') as output:
         json.dump(contentlist,output)
 
+#Scraping
 @app.task
 def hn(url):
     try:
@@ -44,8 +46,41 @@ def hn(url):
     except Exception as e:
         print(e)
 
+#RSS 
+#XML Parsing
+#https://www.reddit.com/r/pathogendavid/comments/tv8m9/pathogendavids_guide_to_rss_and_reddit/
+@app.task
+def reddit():
+    url = "https://www.reddit.com/r/programming/new/.rss?sort=new"
+    headers = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"}
+    res = requests.get(url,headers=headers)
+    soup = BeautifulSoup(res.content,features='xml')
+    entries = soup.findAll('title')
 
+    content = soup.findAll("content")
+    links = []
+    articles = []
+    for cont in content:
+        htmlstring = cont.string
+        blob = re.findall('(<span><a href=".*[link])',htmlstring)
+        tags = re.findall('<.*>',''.join(blob))
+        actuallink = ''.join(tags).split("\"")
+        links.append(actuallink[1])
 
+    # As first entry is just meta information
+    entries = entries[1:]
+
+    for i in range(len(entries)):
+        todict = {}
+        todict['title'] = entries[i].text
+        todict['link'] = links[i]
+        todict['source'] = 'Reddit programming'
+        articles.append(todict)
+
+    return save(articles)
+        
+    
 # if __name__ == "__main__":
 #     for url in HN_URL:
 #         hn(url)
+#     reddit()
