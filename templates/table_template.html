@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FlaskApp</title>
+</head>
+<body>
+<table border="1">
+    <thead>
+        <tr>
+            {% for column in colhead %}
+            <th>{{ column }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for article in articlelist %}
+        <tr>
+            {% for col in colhead %}
+            {% if 'link' in col %}
+                <td><a href= {{article[col]}} style="color: inherit;text-decoration:none !important">{{article[col]}}</a></td>
+            {% else %}
+                <td>{{ article[col] }}</td>
+            {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+</body>
+</html>

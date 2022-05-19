@@ -4,6 +4,19 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
+import os
+import psycopg2
+import json
+from NoDataException import NoDataException
+
+
+def postgresconn():
+    try:
+        conn = psycopg2.connect(host='localhost',database= os.environ['dbname'],user=os.environ['app_user'],password=os.environ['app_password'])
+        return conn
+    except Exception as e:
+        print(e)
+
 
 app = Celery('tasks')
 
@@ -12,23 +25,33 @@ HN_URL = ["https://news.ycombinator.com/","https://news.ycombinator.com/news?p=2
 @app.task
 def save(contentlist):
     timestmp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    fname = 'articles_{}.json'.format(timestmp)
-    with open(fname ,'w') as output:
-        json.dump(contentlist,output)
+    conn = postgresconn()
+    cursor = conn.cursor()
+    prefix = f'INSERT INTO {os.environ["schemaname"]}.{os.environ["tablename"]}(data) VALUES'
+    stmt = ''
+    for content in contentlist:
+        content['title'] = content['title'].replace("'","''")
+        json_object = json.dumps(content)
+        stmt += '(' + "\'" + json_object + "\'" + ')' ','
+    sqlstmt = prefix + stmt[0:-1]
+    res = cursor.execute(sqlstmt)
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return
+
+    
 
 #Scraping
 @app.task
 def hn(url):
     try:
         res = requests.get(url)
-        #soup = BeautifulSoup(res.content,'lxml')
         soup = BeautifulSoup(res.content,'html.parser')
         articles = soup.findAll(class_='titlelink')
         scores = soup.findAll(class_='subtext')
-        #print(scores)
-        #desired = zip(articles,scores)
         
-        #print(articles)
+        
         content = []
         for i in range(len(articles)):
             todict = {}
@@ -79,8 +102,3 @@ def reddit():
 
     return save(articles)
         
-    
-# if __name__ == "__main__":
-#     for url in HN_URL:
-#         hn(url)
-#     reddit()
